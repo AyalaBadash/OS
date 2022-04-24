@@ -21,25 +21,27 @@ int num_of_processes = 0;
 int program_time = 0;
 int cpu_utilization = 0;
 uint start_time = 0;
-int sleeping_processes_mean = 0;
-int runnable_processes_mean = 0;
 int running_processes_mean  = 0;
-struct spinlock pid_lock;
-
-extern void forkret(void);
-static void freeproc(struct proc *p);
-void update_process_timing_in_state(struct proc *p, int state);
-
-extern char trampoline[]; // trampoline.S
-
-uint64 cont_timestamp = 0;	//when ticks > cont_timestamp contiue
+int runnable_processes_mean = 0;
+int sleeping_processes_mean = 0;
 
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the
 // memory model when using p->parent.
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
+struct spinlock pid_lock;
+struct spinlock stats_lock;
 
+
+extern void forkret(void);
+static void freeproc(struct proc *p);
+void update_process_timing_in_state(struct proc *p, int state);
+int print_stats(void);
+
+extern char trampoline[]; // trampoline.S
+
+uint64 cont_timestamp = 0;	//when ticks > cont_timestamp contiue
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -409,12 +411,16 @@ exit(int status)
   
   acquire(&pid_lock);
   
-  running_processes_mean = ( (running_processes_mean * num_of_processes) + p->running_time) / (num_of_processes + 1);
-  runnable_processes_mean = ( (runnable_processes_mean * num_of_processes) + p->runnable_time) / (num_of_processes + 1);
-  sleeping_processes_mean = ( (sleeping_processes_mean * num_of_processes) + p->sleeping_time) / (num_of_processes + 1);
+  acquire(&stats_lock);
+  
   num_of_processes++;
+  running_processes_mean = ( (running_processes_mean * (num_of_processes - 1)) + p->running_time) / num_of_processes;
+  runnable_processes_mean = ( (runnable_processes_mean * (num_of_processes - 1)) + p->runnable_time) / num_of_processes;
+  sleeping_processes_mean = ( (sleeping_processes_mean * (num_of_processes - 1)) + p->sleeping_time) / num_of_processes;
   program_time = program_time + p->running_time;
   cpu_utilization = program_time / (ticks - start_time);
+  
+  release(&stats_lock);
   
   release(&pid_lock);
 
@@ -800,6 +806,18 @@ int kill_system(void){	//maybe check we don't kill ourselves first
     // release(&p->lock);
   }
 	return kill(cur->pid);
+}
+
+int print_stats(void) //*
+{
+  acquire(&stats_lock);
+  printf("running process time mean - &d\n", runnable_processes_mean);
+  printf("runnable process time mean - &d\n", runnable_processes_mean);
+  printf("sleeping process time mean - &d\n", sleeping_processes_mean);
+  printf("program running time - &d\n", program_time);
+  printf("cpu utiliztion - &d\n", cpu_utilization);
+  release(&stats_lock);
+  return 1;
 }
 
 void update_process_timing_in_state(struct proc *p, int state){

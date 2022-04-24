@@ -104,8 +104,9 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
-extern uint64 sys_allp(void);	//*
-extern uint64 sys_allk(void);  //*
+extern uint64 sys_allp(void);	    //*
+extern uint64 sys_allk(void);     //*
+extern uint64 sys_print(void);    //*
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -130,7 +131,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_allp]    sys_allp,	//*
-[SYS_allk]    sys_allk	//*
+[SYS_allk]    sys_allk,	//*
+[SYS_print]   sys_print //* 
 };
 
 void

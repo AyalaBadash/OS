@@ -22,3 +22,4 @@
 #define SYS_close  21
 #define SYS_allp   22	//*
 #define SYS_allk   23	//*
+#define SYS_print  24   //*
