@@ -108,7 +108,7 @@ allocpid() {
   
   acquire(&pid_lock);
   pid = nextpid;
-  nextpid = nextpid + 1;
+  nextpid++;
   release(&pid_lock);
 
   return pid;
@@ -134,9 +134,9 @@ allocproc(void)
   return 0;
 
 found:
-  acquire(&tickslock);
+  // acquire(&tickslock);
   p->last_runnable_time = ticks; 	//save time created for fcfs thingy, tickslock?
-  release(&tickslock);
+  // release(&tickslock);
   p->mean_ticks = 0;
   p->last_ticks = 0;
   p->pid = allocpid();
@@ -407,24 +407,19 @@ exit(int status)
 
   p->state = ZOMBIE;
 
+  // release(&p->lock);
+
   //updating processes timing
   
-  acquire(&pid_lock);
-  
-  acquire(&stats_lock);
+  release(&wait_lock);
   
   num_of_processes++;
   running_processes_mean = ( (running_processes_mean * (num_of_processes - 1)) + p->running_time) / num_of_processes;
   runnable_processes_mean = ( (runnable_processes_mean * (num_of_processes - 1)) + p->runnable_time) / num_of_processes;
   sleeping_processes_mean = ( (sleeping_processes_mean * (num_of_processes - 1)) + p->sleeping_time) / num_of_processes;
-  program_time = program_time + p->running_time;
-  cpu_utilization = program_time / (ticks - start_time);
-  
-  release(&stats_lock);
-  
-  release(&pid_lock);
+  program_time += p->running_time;
+  cpu_utilization = ((program_time * 100) / (ticks - start_time));
 
-  release(&wait_lock);
 
   // Jump into the scheduler, never to return.
   sched();
@@ -524,12 +519,12 @@ scheduler(void)
     #ifdef FCFS // either works or is complete shit, maybe I need to lock before the for loop
     struct proc *min_proc = proc;
     for(p = proc; p < &proc[NPROC]; p++) { //maybe
-      if( (p->state == RUNNABLE) & ( p->last_runnable_time < min_proc->last_runnable_time) ) 
+      if( (p->state == RUNNABLE) && ( p->last_runnable_time <= min_proc->last_runnable_time) ) 
         min_proc = p;
     }
     
     acquire(&min_proc->lock);
-    if(min_proc->state == RUNNABLE & (ticks > cont_timestamp || p->pid == INIT_PROC_PID || p->pid == SHELL_PROC_PID)) {
+    if((min_proc->state == RUNNABLE) & (ticks > cont_timestamp || p->pid == INIT_PROC_PID || p->pid == SHELL_PROC_PID)) {
       //update process timing 
       update_process_timing_in_state(p, p->state);
       min_proc->state = RUNNING;
@@ -543,24 +538,22 @@ scheduler(void)
     #ifdef SJF
     struct proc *min_time_proc = proc;
     for(p = proc; p < &proc[NPROC]; p++) { //maybe
-      if( (p->state == RUNNABLE) && ( p->mean_ticks < min_time_proc->mean_ticks) ) 
+      if( (p->state == RUNNABLE) && ( p->mean_ticks <= min_time_proc->mean_ticks) ) 
         min_time_proc = p;
     }
     acquire(&min_time_proc->lock);
-    if(min_time_proc->state == RUNNABLE & (ticks > cont_timestamp || p->pid == INIT_PROC_PID || p->pid == SHELL_PROC_PID)) {
+    if((min_time_proc->state == RUNNABLE) & (ticks > cont_timestamp || p->pid == INIT_PROC_PID || p->pid == SHELL_PROC_PID)) {
       //update process timing 
       update_process_timing_in_state(p, p->state);
       min_time_proc->state = RUNNING;
       c->proc = min_time_proc;
-      acquire(&tickslock);
       uint start_ticks = ticks;
-      release(&tickslock)
       swtch(&c->context, &min_time_proc->context);
       min_time_proc->last_ticks = ticks - start_ticks;
       min_time_proc->mean_ticks = ( (10-rate) * min_time_proc->mean_ticks + min_time_proc->last_ticks * rate) / 10;
       c->proc = 0;
     }
-    release(&min_proc->lock); 
+    release(&min_time_proc->lock); 
     #endif
   }
 }
@@ -772,17 +765,6 @@ procdump(void)
 int pause_system(int seconds){
 	if(seconds<=0)
 		return 0;
-	// struct proc *p;
-	// for(p = proc; p < &proc[NPROC]; p++){
-	//   if(p->state == RUNNING){
-	//   	acquire(&p->lock);	//***maybe acquire before if statement?
-	//   	//update process timing 
-  //     update_process_timing_in_state(p, p->state);
-  //     p->state = RUNNABLE;
-  //     p->last_runnable_time = ticks;
-	//   	release(&p->lock);
-	//   }
-	// }
 	cont_timestamp = ticks + seconds * 10;
 	yield();
 	return 1;
@@ -797,13 +779,6 @@ int kill_system(void){	//maybe check we don't kill ourselves first
         return -1;
       }
     }
-    // acquire(&p->lock);		//which procs are users & which are kernel
-    // p->killed = 1;
-    // if(p->state == SLEEPING){
-    //   // Wake process from sleep().
-    //   p->state = RUNNABLE;
-    // }
-    // release(&p->lock);
   }
 	return kill(cur->pid);
 }
@@ -811,11 +786,11 @@ int kill_system(void){	//maybe check we don't kill ourselves first
 int print_stats(void) //*
 {
   acquire(&stats_lock);
-  printf("running process time mean - &d\n", runnable_processes_mean);
-  printf("runnable process time mean - &d\n", runnable_processes_mean);
-  printf("sleeping process time mean - &d\n", sleeping_processes_mean);
-  printf("program running time - &d\n", program_time);
-  printf("cpu utiliztion - &d\n", cpu_utilization);
+  printf("running process time mean - %d\n", runnable_processes_mean);
+  printf("runnable process time mean - %d\n", runnable_processes_mean);
+  printf("sleeping process time mean - %d\n", sleeping_processes_mean);
+  printf("program running time - %d\n", program_time);
+  printf("cpu utiliztion - %d\n", cpu_utilization);
   release(&stats_lock);
   return 1;
 }

@@ -97,7 +97,7 @@ sys_uptime(void)
 }
 
 uint64
-sys_allp(void)		//*
+sys_pause_system(void)		//*
 {
 	int seconds;
 	if(argint(0, &seconds) < 0)
@@ -106,13 +106,13 @@ sys_allp(void)		//*
 }
 
 uint64
-sys_allk(void)		//*
+sys_kill_system(void)		//*
 {
 	return kill_system();
 }
 
 uint64
-sys_print(void)   //*
+sys_print_stats(void)   //*
 {
   return print_stats();
 }
