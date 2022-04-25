@@ -519,7 +519,7 @@ scheduler(void)
     #ifdef FCFS // either works or is complete shit, maybe I need to lock before the for loop
     struct proc *min_proc = proc;
     for(p = proc; p < &proc[NPROC]; p++) { //maybe
-      if( (p->state == RUNNABLE) && ( p->last_runnable_time <= min_proc->last_runnable_time) ) 
+      if( (p->state == RUNNABLE) & ( p->last_runnable_time <= min_proc->last_runnable_time) ) 
         min_proc = p;
     }
     
